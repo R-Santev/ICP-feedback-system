@@ -9,6 +9,7 @@ import {
   nat64,
   ic,
   Opt,
+  Principal,
 } from "azle";
 import { v4 as uuidv4 } from "uuid";
 
@@ -18,6 +19,7 @@ type Course = Record<{
   description: string;
   dateAdded: nat64;
   tags: Vec<string>;
+  createdBy: Principal; // Add creator's principal
 }>;
 
 type CoursePayload = Record<{
@@ -36,6 +38,7 @@ type Feedback = Record<{
   downvotes: nat64;
   createdAt: nat64;
   updatedAt: Opt<nat64>;
+  createdBy: Principal; // Add creator's principal
 }>;
 
 type FeedbackPayload = Record<{
@@ -47,11 +50,22 @@ type FeedbackPayload = Record<{
 const courseStorage = new StableBTreeMap<string, Course>(0, 44, 1024);
 const feedbackStorage = new StableBTreeMap<string, Feedback>(1, 45, 1024);
 
+globalThis.crypto = {
+  // @ts-ignore
+  getRandomValues: () => {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return array;
+  },
+};
+
 $update;
 export function addCourse(payload: CoursePayload): Result<Course, string> {
+  const caller = ic.provisional_create_canister({ controller: ic.caller() });
   const course: Course = {
     id: uuidv4(),
     dateAdded: ic.time(),
+    createdBy: caller,
     ...payload,
   };
 
@@ -67,9 +81,9 @@ export function getAllCourses(): Result<Vec<Course>, string> {
 $query;
 export function getCourse(courseId: string): Result<Course, string> {
   return match(courseStorage.get(courseId), {
-    Some: (message) => Result.Ok<Course, string>(message),
+    Some: (course) => Result.Ok<Course, string>(course),
     None: () =>
-      Result.Err<Course, string>(`a message with id=${courseId} not found`),
+      Result.Err<Course, string>(`Course with id=${courseId} not found`),
   });
 }
 
@@ -77,6 +91,7 @@ $update;
 export function addFeedback(
   payload: FeedbackPayload
 ): Result<Feedback, string> {
+  const caller = ic.provisional_create_canister({ controller: ic.caller() });
   const course = courseStorage.get(payload.courseId);
   if (!course) {
     return Result.Err<Feedback, string>("Course not found.");
@@ -88,7 +103,7 @@ export function addFeedback(
     upvotes: BigInt(0),
     downvotes: BigInt(0),
     createdAt: ic.time(),
-    updatedAt: Opt.None,
+    createdBy: caller,
     ...payload,
   };
 
@@ -109,14 +124,15 @@ export function getFeedbackForCourse(
 $query;
 export function getFeedback(feedbackId: string): Result<Feedback, string> {
   return match(feedbackStorage.get(feedbackId), {
-    Some: (message) => Result.Ok<Feedback, string>(message),
+    Some: (feedback) => Result.Ok<Feedback, string>(feedback),
     None: () =>
-      Result.Err<Feedback, string>(`a message with id=${feedbackId} not found`),
+      Result.Err<Feedback, string>(`Feedback with id=${feedbackId} not found`),
   });
 }
 
 $update;
 export function upvoteFeedback(feedbackId: string): Result<Feedback, string> {
+  const caller = ic.provisional_create_canister({ controller: ic.caller() });
   const feedbackOpt = feedbackStorage.get(feedbackId);
 
   if (feedbackOpt && feedbackOpt.Some) {
@@ -131,6 +147,7 @@ export function upvoteFeedback(feedbackId: string): Result<Feedback, string> {
 
 $update;
 export function downvoteFeedback(feedbackId: string): Result<Feedback, string> {
+  const caller = ic.provisional_create_canister({ controller: ic.caller() });
   const feedbackOpt = feedbackStorage.get(feedbackId);
 
   if (feedbackOpt && feedbackOpt.Some) {
@@ -147,7 +164,7 @@ export function downvoteFeedback(feedbackId: string): Result<Feedback, string> {
 globalThis.crypto = {
   // @ts-ignore
   getRandomValues: () => {
-    let array = new Uint8Array(32);
+    const array = new Uint8Array(32);
 
     for (let i = 0; i < array.length; i++) {
       array[i] = Math.floor(Math.random() * 256);
