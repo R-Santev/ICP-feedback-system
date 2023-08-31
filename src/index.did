@@ -1,0 +1,42 @@
+type Course = record {
+  id : text;
+  title : text;
+  tags : vec text;
+  description : text;
+  dateAdded : nat64;
+};
+type CoursePayload = record {
+  title : text;
+  tags : vec text;
+  description : text;
+};
+type Feedback = record {
+  id : text;
+  attachmentURL : opt text;
+  upvotes : nat64;
+  createdAt : nat64;
+  updatedAt : opt nat64;
+  message : text;
+  rating : float64;
+  downvotes : nat64;
+  courseId : text;
+};
+type FeedbackPayload = record {
+  message : text;
+  rating : float64;
+  courseId : text;
+};
+type _AzleResult = variant { Ok : Course; Err : text };
+type _AzleResult_1 = variant { Ok : Feedback; Err : text };
+type _AzleResult_2 = variant { Ok : vec Course; Err : text };
+type _AzleResult_3 = variant { Ok : vec Feedback; Err : text };
+service : () -> {
+  addCourse : (CoursePayload) -> (_AzleResult);
+  addFeedback : (FeedbackPayload) -> (_AzleResult_1);
+  downvoteFeedback : (text) -> (_AzleResult_1);
+  getAllCourses : () -> (_AzleResult_2) query;
+  getCourse : (text) -> (_AzleResult) query;
+  getFeedback : (text) -> (_AzleResult_1) query;
+  getFeedbackForCourse : (text) -> (_AzleResult_3) query;
+  upvoteFeedback : (text) -> (_AzleResult_1);
+}

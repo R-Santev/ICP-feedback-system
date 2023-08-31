@@ -1,13 +1,13 @@
 {
   "canisters": {
-    "message_board": {
+    "course_feedback": {
       "main": "src/index.ts",
       "type": "custom",
-      "build": "npx azle message_board",
+      "build": "npx azle course_feedback",
       "root": "src",
       "ts": "src/index.ts",
       "candid": "src/index.did",
-      "wasm": ".azle/message_board/message_board.wasm.gz"
+      "wasm": ".azle/course_feedback/course_feedback.wasm.gz"
     }
   }
 }
