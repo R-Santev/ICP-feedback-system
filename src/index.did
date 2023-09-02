@@ -36,7 +36,7 @@ service : () -> {
   downvoteFeedback : (text) -> (_AzleResult_1);
   getAllCourses : () -> (_AzleResult_2) query;
   getCourse : (text) -> (_AzleResult) query;
-  getFeedback : (text) -> (_AzleResult_1) query;
+  getFeedbackById : (text) -> (_AzleResult_1) query;
   getFeedbackForCourse : (text) -> (_AzleResult_3) query;
   upvoteFeedback : (text) -> (_AzleResult_1);
 }
