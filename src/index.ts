@@ -49,19 +49,37 @@ const feedbackStorage = new StableBTreeMap<string, Feedback>(1, 45, 1024);
 
 $update;
 export function addCourse(payload: CoursePayload): Result<Course, string> {
+  // const existingCourse = courseStorage.get(payload.title);
+  // if (existingCourse) {
+  //   return Result.Err("Course already exists");
+  // }
+  // Validate the payload before processing it
+  if (!payload.title || !payload.description || !payload.tags) {
+    return Result.Err<Course, string>("Invalid payload");
+  }
+
   const course: Course = {
     id: uuidv4(),
+    title: payload.title,
+    description: payload.description,
     dateAdded: ic.time(),
-    ...payload,
+    tags: payload.tags,
   };
-
-  courseStorage.insert(course.id, course);
-  return Result.Ok(course);
+  try {
+    courseStorage.insert(course.id, course);
+    return Result.Ok(course);
+  } catch (error) {
+    return Result.Err("Failed to insert course");
+  }
 }
 
 $query;
 export function getAllCourses(): Result<Vec<Course>, string> {
-  return Result.Ok(courseStorage.values());
+  try {
+    return Result.Ok(courseStorage.values());
+  } catch (error) {
+    return Result.Err("Failed to fetch courses");
+  }
 }
 
 $query;
@@ -69,7 +87,7 @@ export function getCourse(courseId: string): Result<Course, string> {
   return match(courseStorage.get(courseId), {
     Some: (message) => Result.Ok<Course, string>(message),
     None: () =>
-      Result.Err<Course, string>(`a message with id=${courseId} not found`),
+      Result.Err<Course, string>(`A course with id=${courseId} not found`),
   });
 }
 
@@ -77,9 +95,19 @@ $update;
 export function addFeedback(
   payload: FeedbackPayload
 ): Result<Feedback, string> {
+  if (!payload.courseId || !payload.rating || !payload.message) {
+    return Result.Err<Feedback, string>("Invalid payload.");
+  }
+
   const course = courseStorage.get(payload.courseId);
   if (!course) {
-    return Result.Err<Feedback, string>("Course not found.");
+    return Result.Err<Feedback, string>(
+      `Course with id ${payload.courseId} not found.`
+    );
+  }
+
+  if (payload.rating < 0 || payload.rating > 5) {
+    return Result.Err<Feedback, string>("Invalid rating.");
   }
 
   const feedback: Feedback = {
@@ -92,26 +120,38 @@ export function addFeedback(
     ...payload,
   };
 
-  feedbackStorage.insert(feedback.id, feedback);
-  return Result.Ok(feedback);
+  try {
+    feedbackStorage.insert(feedback.id, feedback);
+    return Result.Ok(feedback);
+  } catch (error) {
+    return Result.Err<Feedback, string>(
+      "An error occurred while inserting feedback"
+    );
+  }
 }
 
 $query;
 export function getFeedbackForCourse(
   courseId: string
 ): Result<Vec<Feedback>, string> {
-  const feedbacks = feedbackStorage
-    .values()
-    .filter((feedback) => feedback.courseId === courseId);
-  return Result.Ok(feedbacks);
+  try {
+    const feedbacks = feedbackStorage
+      .values()
+      .filter((feedback) => feedback.courseId === courseId);
+    return Result.Ok(feedbacks);
+  } catch (error) {
+    return Result.Err(
+      "An error occurred while retrieving feedback for the course."
+    );
+  }
 }
 
 $query;
-export function getFeedback(feedbackId: string): Result<Feedback, string> {
+export function getFeedbackById(feedbackId: string): Result<Feedback, string> {
   return match(feedbackStorage.get(feedbackId), {
     Some: (message) => Result.Ok<Feedback, string>(message),
     None: () =>
-      Result.Err<Feedback, string>(`a message with id=${feedbackId} not found`),
+      Result.Err<Feedback, string>(`Feedback with id ${feedbackId} not found`),
   });
 }
 
@@ -121,9 +161,13 @@ export function upvoteFeedback(feedbackId: string): Result<Feedback, string> {
 
   if (feedbackOpt && feedbackOpt.Some) {
     const feedback = feedbackOpt.Some;
-    feedback.upvotes = feedback.upvotes + BigInt(1);
-    feedbackStorage.insert(feedback.id, feedback);
-    return Result.Ok(feedback);
+    const updatedFeedback = {
+      ...feedback,
+      upvotes: feedback.upvotes + BigInt(1),
+      updatedAt: Opt.Some(ic.time()),
+    };
+    feedbackStorage.insert(updatedFeedback.id, updatedFeedback);
+    return Result.Ok(updatedFeedback);
   } else {
     return Result.Err<Feedback, string>("Feedback not found.");
   }
@@ -135,9 +179,14 @@ export function downvoteFeedback(feedbackId: string): Result<Feedback, string> {
 
   if (feedbackOpt && feedbackOpt.Some) {
     const feedback = feedbackOpt.Some;
-    feedback.downvotes = feedback.downvotes + BigInt(1);
-    feedbackStorage.insert(feedback.id, feedback);
-    return Result.Ok(feedback);
+    const updatedFeedback = {
+      ...feedback,
+      downvotes: feedback.downvotes + BigInt(1),
+      updatedAt: Opt.Some(ic.time()),
+    };
+
+    feedbackStorage.insert(updatedFeedback.id, updatedFeedback);
+    return Result.Ok(updatedFeedback);
   } else {
     return Result.Err<Feedback, string>("Feedback not found.");
   }
@@ -145,7 +194,7 @@ export function downvoteFeedback(feedbackId: string): Result<Feedback, string> {
 
 // Here's the workaround for the UUID package with Azle
 globalThis.crypto = {
-  // @ts-ignore
+  //@ts-ignore
   getRandomValues: () => {
     let array = new Uint8Array(32);
 
